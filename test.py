@@ -1,10 +1,21 @@
-    # post = driver.find_element(By.CSS_SELECTOR, '.text_exposed_root')
-    # print(post.text)
-    # context = driver.find_element(By.CSS_SELECTOR,"span.text_exposed_show")
-    # print(context.get_attribute("outerHTML"))
+import re
 
-def bt4():
-    response = requests.get('https://www.facebook.com/plugins/post.php?href=https%3A%2F%2Fwww.facebook.com%2Ftaiwanauction%2Fposts%2F5096405560436133')
-    soup = BeautifulSoup(response.text, "html.parser")
-    resoult=soup.find_all(class_="text_exposed_root")
-    print(resoult)
+
+def findFirst(pattern, text):  # 找第一個
+    return re.compile((r"{}").format(pattern)).search(text).group()
+
+
+def findAll(pattern, text):  # 找全部 包含空白
+    return re.findall((r"{}").format(pattern), text)
+
+
+def findPrecise(pattern, text):  # 精確找全部
+    DATA = {}
+    for clo, pa in pattern.items():
+        DATA[clo] = [i.group() for i in re.finditer(pa, text)]
+    return DATA
+
+text = "https://www.facebook.com/%E5%A4%A7%E5%90%8C3c%E7%89%B9%E8%B3%A3%E6%9C%83-%E9%AB%98%E9%9B%84%E5%8D%80-308891219757346/"
+if "z" in  text:
+    print("ok")
+
