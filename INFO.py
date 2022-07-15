@@ -1,3 +1,5 @@
+from email.message import Message
+from unicodedata import name
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.keys import Keys
@@ -20,10 +22,18 @@ class TopPost:
 
     def Chrome(self, url):
         global driver
-        option = webdriver.ChromeOptions()
-        option.add_argument('--disable-notifications')
-        path = Service('E:/Vivaldi/driver/chromedriver.exe')
-        driver = webdriver.Chrome(service=path, options=option)
+        options = webdriver.ChromeOptions()
+        prefs = {
+            'profile.default_content_setting_values':{
+                'images':2,
+            }
+        }
+        options.add_argument('--disable-notifications')
+        options.add_experimental_option('prefs',prefs)
+        #path = Service('E:/Vivaldi/driver/chromedriver.exe') #家裡
+        path = Service('D:/05_home/Flashsale/chromedriver.exe') #公司
+
+        driver = webdriver.Chrome(service=path, options=options)
         driver.get(url)
         return driver
 
@@ -42,9 +52,12 @@ class TopPost:
     
     def wait(self,method,rule):
         return WebDriverWait(self.dri, 10).until(EC.presence_of_element_located((method, rule)))
-        
-    def getHref(self, url):  # 抓取第一篇文
-        self.dri.get(url)
+
+    def isdriver(self,url):#確保瀏覽器開啟
+        return self.dri.get(url) if self.dri != 0 else self.Chrome(url)
+
+    def getHref(self, url):  # 抓取第一篇文章url
+        self.isdriver(url)
         actions = ActionChains(self.dri)
         arrow = self.wait(By.CSS_SELECTOR,'span:nth-child(2) > span > a')
         actions.move_to_element(arrow).perform()
@@ -53,13 +66,16 @@ class TopPost:
         else :
             context = self.wait(By.CSS_SELECTOR,'[href*="posts"]')
         href = context.get_attribute("href")
-        self.dri.get(href)
+        return href
+
+    def getMessage(self, url):
+        self.isdriver(url)
         self.wait(By.XPATH,'//*[text()="顯示更多"]').click() 
         context = self.wait(By.CSS_SELECTOR,'[data-ad-comet-preview="message"]')
         return context.text
 
     def getTop(self, url):  # 抓取置頂文
-        self.dri.get(url)
+        self.isdriver(url)
         showmany =self.wait(By.XPATH,'//*[text()="顯示更多"]').click() 
         context = self.wait(By.CSS_SELECTOR,'div[role="feed"]')
         return context.text
@@ -76,50 +92,85 @@ class TopPost:
             DATA[clo] = [i.group() for i in re.finditer(pa, text)]
         return DATA
 
+    def pageclose(self):
+        return self.dri.close()
 
 
-X = {'Address': "\w*(縣|市)\w*號", 'Time': "\d+\s*[:：]\s*\d+", 'Date': "(\d+[/／]\d+[/／]\d+)|(\d+[/／]\d+)|(即日起)|(\d+月\d+日)"}
-fb = TopPost()
-fb._log_fb()
-test = []
-start = time.time()
-for u in urls.flashstore:#78秒
+def collectPostUrl():
+    PostUrl=[]
+    for u in urls.flashstore:
+        posturl = fb.getHref(u)
+        PostUrl.append(posturl)
+    return PostUrl
+
+def getcontext(url):
     try:
-        text = fb.getHref(u)
+        text = fb.getMessage(url)
         find_text = fb.findPrecise(X, text)
-        find_text['url'] = u
+        find_text['url'] = url
         find_text['context'] = text
         test.append(find_text)
-        print(find_text)
-    except ElementClickInterceptedException:#當前元素是不可以點選,但是確實存在在頁面上,有可能是被loading覆蓋了
-        text = fb.getTop(u)
-        find_text = fb.findPrecise(X, text)
-        find_text['url'] = u
-        find_text['context'] = text
-        test.append(find_text)
-        print(find_text)
+        return find_text
     except:
-        print("未知錯誤",u)
-end = time.time()
-print(end - start)
-
-# start = time.time() #66秒
-# def first(url):
-#     text = fb.getHref(url)
-#     find_text = fb.findPrecise(X, text)
-#     find_text['url'] = url
-#     find_text['context'] = text
-#     test.append(find_text)
+        return ("未知錯誤",url)
     
-# def second(url):
-#     text = fb.getTop(url)
-#     find_text = fb.findPrecise(X, text)
-#     find_text['url'] = url
-#     find_text['context'] = text
-#     test.append(find_text)
-#     print(test)
-# with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-#     executor.map(first, urls.flashstore)
-# print(test)
-# end = time.time()
-# print(end - start)
+
+
+def debug():
+    X = {'Address': "\w*(縣|市)\w*號", 'Time': "\d+\s*[:：]\s*\d+", 'Date': "(\d+[/／]\d+[/／]\d+)|(\d+[/／]\d+)|(即日起)|(\d+月\d+日)"}
+    fb = TopPost()
+    fb._log_fb()
+    test = []
+    start = time.time()
+
+    for u in urls.flashstore:#78秒
+        try:
+            posturl = fb.getHref(u)
+            text = fb.getMessage(posturl)
+            find_text = fb.findPrecise(X, text)
+            find_text['url'] = u
+            find_text['context'] = text
+            test.append(find_text)
+            print(find_text)
+        except ElementClickInterceptedException:#當前元素是不可以點選,但是確實存在在頁面上,有可能是被loading覆蓋了
+            text = fb.getTop(u)
+            find_text = fb.findPrecise(X, text)
+            find_text['url'] = u
+            find_text['context'] = text
+            test.append(find_text)
+            print(find_text)
+        except:
+            print("未知錯誤",u)
+    end = time.time()
+    print(end - start)
+
+if __name__ =='__main__': ##229秒
+    
+    X = {'Address': "\w*(縣|市)\w*號", 'Time': "\d+\s*[:：]\s*\d+", 'Date': "(\d+[/／]\d+[/／]\d+)|(\d+[/／]\d+)|(即日起)|(\d+月\d+日)"}
+    thread_list = []
+    test = []
+    fb = TopPost()
+    fb._log_fb()
+    posturl = collectPostUrl()
+    semaphore = threading.BoundedSemaphore(5) #最大線程數5個
+    start = time.time()
+    try:
+        for idx, url in enumerate(posturl):
+            t = threading.Thread(name=f'Thread {idx}', target=getcontext, args=(url,))
+            t.start()
+            thread_list.append(t)
+            print(t.name,' started')
+
+    except:
+        print("未知錯誤",url)
+        
+
+    for t in thread_list:
+        t.join()
+        print(t.name,' join')
+
+    end = time.time()
+    print(test)
+    fb.pageclose()
+    
+    print(end - start)
